@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Gold Analyzer - Python Edition</title>
+    <!-- Google Fonts សម្រាប់អក្សរខ្មែរ -->
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --gold: #D4AF37;
+            --gold-dark: #b8860b;
+            --bg-dark: #121212;
+            --card-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Kantumruy Pro', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: var(--gold);
+            font-size: 24px;
+            margin: 0;
+        }
+
+        /* ផ្នែកកាមេរ៉ា */
+        .camera-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1/1;
+            background: #000;
+            border: 2px solid var(--gold);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* សញ្ញាតម្រង់ចំកណ្តាល */
+        .target-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border: 2px solid #fff;
+            border-radius: 10px;
+            pointer-events: none;
+            box-shadow: 0 0 0 1000px rgba(0,0,0,0.4);
+        }
+
+        /* ប៊ូតុងបញ្ជា */
+        .controls {
+            margin-top: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Kantumruy Pro';
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-calib { background: #333; color: white; }
+        .btn-analyze { 
+            background: linear-gradient(45deg, var(--gold), var(--gold-dark));
+            color: black;
+            grid-column: span 2;
+            font-size: 18px;
+        }
+
+        .btn:active { transform: scale(0.95); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* បង្ហាញលទ្ធផល */
+        .result-card {
+            margin-top: 20px;
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            display: none;
+            border-left: 5px solid var(--gold);
+        }
+
+        .res-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .res-label { color: #888; font-size: 14px; }
+        .res-value { font-weight: bold; color: var(--gold); }
+
+        .purity-tag {
+            font-size: 32px;
+            text-align: center;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        canvas { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>AI Gold Analyzer</h1>
+            <p style="font-size: 12px; color: #888;">វិភាគកម្រិតភាពបរិសុទ្ធលោហៈធាតុ (Python AI)</p>
+        </div>
+
+        <div class="camera-box">
+            <video id="video" autoplay playsinline></video>
+            <div class="target-overlay"></div>
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-calib" id="calibBtn">⚪ លៃពន្លឺ (ស)</button>
+            <label for="fileUpload" class="btn btn-calib" style="text-align: center;">📁 បើករូបភាព</label>
+            <input type="file" id="fileUpload" accept="image/*" style="display: none;">
+            
+            <button class="btn btn-analyze" id="analyzeBtn" disabled>✨ ចាប់ផ្តើមវិភាគ</button>
+        </div>
+
+        <!-- ផ្ទាំងលទ្ធផល -->
+        <div class="result-card" id="resultCard">
+            <div class="res-row" style="border:none;">
+                <span class="res-label">លទ្ធផលប៉ាន់ស្មាន៖</span>
+                <span id="resStatus" style="color: #00ff00;">● ជោគជ័យ</span>
+            </div>
+            <div class="purity-tag" id="resPurity">--</div>
+            
+            <div class="res-row">
+                <span class="res-label">ប្រភេទលោហៈ:</span>
+                <span class="res-value" id="resMetal">-</span>
+            </div>
+            <div class="res-row">
+                <span class="res-label">កម្រិតជឿជាក់:</span>
+                <span class="res-value" id="resConfidence">0%</span>
+            </div>
+            <div class="res-row">
+                <span class="res-label">ព័ត៌មានបន្ថែម:</span>
+                <span class="res-value" id="resDesc" style="font-size: 12px;">-</span>
+            </div>
+        </div>
+
+        <p style="font-size: 10px; color: #555; text-align: center; margin-top: 20px;">
+            * បញ្ជាក់៖ នេះជាការប៉ាន់ស្មានបឋមដោយផ្អែកលើការវិភាគពណ៌។
+        </p>
+    </div>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const calibBtn = document.getElementById('calibBtn');
+        const resultCard = document.getElementById('resultCard');
+
+        let calibFactor = { r: 1, g: 1, b: 1 };
+
+        // ១. បើកកាមេរ៉ា
+        async function initCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" }, 
+                    audio: false 
+                });
+                video.srcObject = stream;
+            } catch (e) {
+                alert("មិនអាចបើកកាមេរ៉ាបានទេ");
+            }
+        }
+
+        // ២. ទាញយកពណ៌ RGB ពីចំកណ្តាលកាមេរ៉ា
+        function getCenterRGB() {
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            const x = canvas.width / 2;
+            const y = canvas.height / 2;
+            const data = ctx.getImageData(x-10, y-10, 20, 20).data;
+
+            let r=0, g=0, b=0;
+            for(let i=0; i<data.length; i+=4) {
+                r += data[i]; g += data[i+1]; b += data[i+2];
+            }
+            const count = data.length/4;
+            return { r: r/count, g: g/count, b: b/count };
+        }
+
+        // ៣. លៃពន្លឺ (Calibration)
+        calibBtn.addEventListener('click', () => {
+            const rgb = getCenterRGB();
+            calibFactor.r = 255 / (rgb.r || 1);
+            calibFactor.g = 255 / (rgb.g || 1);
+            calibFactor.b = 255 / (rgb.b || 1);
+            
+            calibBtn.innerText = "✓ បានលៃពន្លឺ";
+            calibBtn.style.color = "#00ff00";
+            analyzeBtn.disabled = false;
+        });
+
+        // ៤. ផ្ញើទៅ Python Backend (/analyze)
+        analyzeBtn.addEventListener('click', () => {
+            const rawRGB = getCenterRGB();
+            const correctedRGB = {
+                r: rawRGB.r * calibFactor.r,
+                g: rawRGB.g * calibFactor.g,
+                b: rawRGB.b * calibFactor.b
+            };
+
+            analyzeBtn.innerText = "កំពុងវិភាគ...";
+            analyzeBtn.disabled = true;
+
+            fetch('/analyze', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rgb: correctedRGB })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.error) throw new Error(data.error);
+                
+                resultCard.style.display = "block";
+                document.getElementById('resPurity').innerText = data.purity;
+                document.getElementById('resMetal').innerText = data.metal_type;
+                document.getElementById('resConfidence').innerText = data.confidence;
+                document.getElementById('resDesc').innerText = data.description;
+                document.getElementById('resStatus').innerText = "● " + data.status;
+
+                analyzeBtn.innerText = "✨ ចាប់ផ្តើមវិភាគ";
+                analyzeBtn.disabled = false;
+                resultCard.scrollIntoView({ behavior: 'smooth' });
+            })
+            .catch(err => {
+                alert("កំហុស៖ " + err.message);
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerText = "✨ ចាប់ផ្តើមវិភាគ";
+            });
+        });
+
+        // ៥. បើករូបភាពពី Gallery
+        document.getElementById('fileUpload').addEventListener('change', function(e) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    const rgb = getCenterRGB(); // ក្នុងករណីនេះទាញយកពីកណ្តាលរូបភាព
+                    
+                    // បើ Upload រូបភាព យើងមិនបាច់ Calibrate ក៏បាន (ឬ Calibrate តាមរូបភាព)
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.click();
+                }
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        });
+
+        window.onload = initCamera;
+    </script>
+</body>
+</html>
